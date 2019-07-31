@@ -2,6 +2,7 @@
 #define __DIRECT_METHODS__
 
 #include <vector>
+#include <memory>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
@@ -100,9 +101,8 @@ void pose_estimation_direct(
     Eigen::Isometry3d &T)
 {
     using g2oBlock = g2o::BlockSolver<g2o::BlockSolverTraits<6, 1>>; // pose 6, gray 1
-    g2oBlock::LinearSolverType *linearSolver = new g2o::LinearSolverDense<g2oBlock::PoseMatrixType>();
-    g2oBlock *solver_ptr = new g2oBlock(linearSolver);
-    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    std::unique_ptr<g2oBlock::LinearSolverType> linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2oBlock::PoseMatrixType>>();
+    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2oBlock>(std::move(linearSolver)));
     g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(solver);
     optimizer.setVerbose(true);

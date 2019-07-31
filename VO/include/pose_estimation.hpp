@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <iostream>
+#include <memory>
 #include <opencv2/opencv.hpp>
 
 #include <Eigen/Core>
@@ -59,9 +60,10 @@ void bundle_adjustment(
     const cv::Mat &K, cv::Mat &R, cv::Mat &t)
 {
     using g2oBlock = g2o::BlockSolver<g2o::BlockSolverTraits<6, 3>>; // pose 6, landmark 3
-    g2oBlock::LinearSolverType *linearSolver = new g2o::LinearSolverCSparse<g2oBlock::PoseMatrixType>();
-    g2oBlock *solver_ptr = new g2oBlock(linearSolver);
-    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    // g2oBlock::LinearSolverType *linearSolver = new g2o::LinearSolverCSparse<g2oBlock::PoseMatrixType>();
+    std::unique_ptr<g2oBlock::LinearSolverType> linearSolver = g2o::make_unique<g2o::LinearSolverCSparse<g2oBlock::PoseMatrixType>>();
+    // g2oBlock *solver_ptr = new g2oBlock(linearSolver);
+    g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2oBlock>(std::move(linearSolver)));
     g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(solver);
 
