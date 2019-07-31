@@ -95,7 +95,7 @@ int main(int argc, char const *argv[])
             continue;
         float d1 = d / 1000.0;
         cv::Point2f pt1 = pixel2cam(keypoints1[m.queryIdx].pt, K);
-        
+
         u = int(keypoints2[m.trainIdx].pt.y);
         v = int(keypoints2[m.trainIdx].pt.x);
         d = img2depth.at<unsigned short>(u, v);
@@ -119,5 +119,37 @@ int main(int argc, char const *argv[])
               << t3 << std::endl;
     // direct method
     std::cout << "========== direct method ==========" << std::endl;
+    // extract img1 FAST feature points
+    std::vector<cv::KeyPoint> img1_fast_points;
+    cv::Ptr<cv::FastFeatureDetector> fast_detector = cv::FastFeatureDetector::create();
+    fast_detector->detect(img1, img1_fast_points);
+    cv::Mat img1_gray;
+    cv::cvtColor(img1, img1_gray, cv::COLOR_BGR2GRAY);
+    std::vector<Eigen::Vector3d> pos_world;
+    std::vector<float> pos_gray;
+    for (auto p : img1_fast_points)
+    {
+        if ((p.pt.x < 20) || (p.pt.x > img1.cols - 20) ||
+            (p.pt.y < 20) || (p.pt.y > img1.cols - 20))
+            continue;
+        unsigned short d = img1depth.at<unsigned short>(cvRound(p.pt.y), cvRound(p.pt.x));
+        if (d == 0)
+            continue;
+        float d1 = d / 1000.0;
+        cv::Point2f pt1_cam = pixel2cam(p.pt, K);
+        pos_world.push_back(Eigen::Vector3d(pt1_cam.x * d1, pt1_cam.y * d1, d1));
+        pos_gray.push_back(float(img1_gray.at<u_int8_t>(cvRound(p.pt.y), cvRound(p.pt.x))));
+    }
+    cv::Mat img2_gray;
+    cv::cvtColor(img2, img2_gray, cv::COLOR_BGR2GRAY);
+    cv::Mat R4, t4, v4;
+    pose_estimation_direct(pos_world, pos_gray, &img2_gray, K, R4, t4);
+    cv::Rodrigues(R4, v4);
+    std::cout << "R = " << std::endl
+              << R4 << std::endl
+              << "v = " << std::endl
+              << cv::norm(v4, cv::NORM_L2) << std::endl
+              << "t = " << std::endl
+              << t4 << std::endl;
     return 0;
 }

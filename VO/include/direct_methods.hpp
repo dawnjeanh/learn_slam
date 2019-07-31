@@ -5,6 +5,7 @@
 #include <memory>
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/eigen.hpp>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <g2o/core/base_vertex.h>
@@ -97,8 +98,8 @@ private:
 void pose_estimation_direct(
     const std::vector<Eigen::Vector3d> pos_world,
     const std::vector<float> pos_gray,
-    cv::Mat *img, Eigen::Matrix3d &K,
-    Eigen::Isometry3d &T)
+    cv::Mat *img, cv::Mat &K,
+    cv::Mat &R, cv::Mat &t)
 {
     using g2oBlock = g2o::BlockSolver<g2o::BlockSolverTraits<6, 1>>; // pose 6, gray 1
     std::unique_ptr<g2oBlock::LinearSolverType> linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2oBlock::PoseMatrixType>>();
@@ -108,15 +109,17 @@ void pose_estimation_direct(
     optimizer.setVerbose(true);
     // vertex
     g2o::VertexSE3Expmap *pose = new g2o::VertexSE3Expmap();
-    pose->setEstimate(g2o::SE3Quat(T.rotation(), T.translation()));
+    pose->setEstimate(g2o::SE3Quat(Eigen::Matrix3d::Identity(), Eigen::Vector3d::Identity()));
     pose->setId(0);
     optimizer.addVertex(pose);
     // edges
+    Eigen::Matrix3d K_;
+    cv::cv2eigen(K, K_);
     for (int i = 0; i < pos_world.size(); ++i)
     {
         EdgeSE3ProjectDirect *edge = new EdgeSE3ProjectDirect(
             pos_world[i],
-            K(0, 0), K(1, 1), K(0, 2), K(1, 2), img);
+            K_(0, 0), K_(1, 1), K_(0, 2), K_(1, 2), img);
         edge->setVertex(0, pose);
         edge->setMeasurement(pos_gray[i]);
         edge->setInformation(Eigen::Matrix<double, 1, 1>::Identity());
@@ -125,7 +128,11 @@ void pose_estimation_direct(
     }
     optimizer.initializeOptimization();
     optimizer.optimize(30);
-    T = pose->estimate();
+    Eigen::Matrix4d T = Eigen::Isometry3d(pose->estimate()).matrix();
+    R = (cv::Mat_<double>(3, 3) << T(0, 0), T(0, 1), T(0, 2),
+         T(1, 0), T(1, 1), T(1, 2),
+         T(2, 0), T(2, 1), T(2, 2));
+    t = (cv::Mat_<double>(3, 1) << T(0, 3), T(1, 3), T(2, 3));
 }
 
 #endif // !__DIRECT_METHODS__
