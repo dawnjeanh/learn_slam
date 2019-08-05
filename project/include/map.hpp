@@ -2,8 +2,6 @@
 #define __MAP__
 
 #include "common.hpp"
-#include "mappoint.hpp"
-#include "frame.hpp"
 
 namespace myslam
 {

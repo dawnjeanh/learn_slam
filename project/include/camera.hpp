@@ -10,7 +10,14 @@ class Camera
 public:
     using Ptr = std::shared_ptr<Camera>;
     float fx_, fy_, cx_, cy_, depth_scale_;
-    Camera() {}
+    Camera()
+    {
+        fx_ = Config::get<float>("camera.fx");
+        fy_ = Config::get<float>("camera.fy");
+        cx_ = Config::get<float>("camera.cx");
+        cy_ = Config::get<float>("camera.cy");
+        depth_scale_ = Config::get<float>("camera.depth_scale");
+    }
     Camera(float fx, float fy, float cx, float cy, float depth_scale) : fx_(fx), fy_(fy), cx_(cx), cy_(cy), depth_scale_(depth_scale) {}
     // coordinate transform: world, camera, pixel
     Eigen::Vector3d world2camera(const Eigen::Vector3d &p_w, const Sophus::SE3d &T_c_w)

@@ -2,7 +2,6 @@
 #define __FRAME__
 
 #include "common.hpp"
-#include "camera.hpp"
 
 namespace myslam
 {
