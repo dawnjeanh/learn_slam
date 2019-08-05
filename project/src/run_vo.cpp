@@ -90,7 +90,7 @@ int main(int argc, char **argv)
             vis.showWidget("path", path);
             vis.showWidget("path_", path_);
         }
-        
+
         cv::Affine3d M(
             cv::Affine3d::Mat3(
                 R(0, 0), R(0, 1), R(0, 2),
