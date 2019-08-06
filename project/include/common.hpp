@@ -2,6 +2,7 @@
 #define __COMMON__
 
 #include <vector>
+#include <list>
 #include <memory>
 #include <algorithm>
 #include <unordered_map>

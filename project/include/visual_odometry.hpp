@@ -58,12 +58,11 @@ public:
         case INITIALIZING:
             state_ = OK;
             curr_ = ref_ = frame;
-            map_->insertKeyFrame(frame);
             // extract feature from first frame
             extractKeyPoints();
             computeDescriptors();
-            // compute the 3D position of feature in ref frame
-            setRef3DPoints();
+            // add first frame as key-frame
+            addKeyFrame();
             break;
         case OK:
             curr_ = frame;
@@ -205,7 +204,28 @@ protected:
     }
     void addKeyFrame()
     {
+        if (map_->key_frames_.empty())
+        {
+            // first key-frame, add all 3d points into map
+            for (int i = 0; i < keypoint_curr_.size(); ++i)
+            {
+                double d = curr_->getDepth(keypoint_curr_[i]);
+                if (d < 0)
+                    continue;
+                Eigen::Vector3d p_world = ref_->camera_->pixel2world(
+                    Eigen::Vector2d(keypoint_curr_[i].pt.x, keypoint_curr_[i].pt.y),
+                    curr_->T_c_w_, d
+                );
+                Eigen::Vector3d n = p_world - ref_->getCamCenter();
+                n.normalize();
+                MapPoint::Ptr map_point = MapPoint::createMapPoint(
+                    p_world, n, descriptors_curr_.row(i).clone(), curr_.get()
+                );
+                map_->insertMapPoint(map_point);
+            }
+        }
         map_->insertKeyFrame(curr_);
+        ref_ = curr_;
     }
     bool checkEstimationPose()
     {
