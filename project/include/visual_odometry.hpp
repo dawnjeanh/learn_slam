@@ -154,6 +154,37 @@ protected:
             R.at<double>(2, 0), R.at<double>(2, 1), R.at<double>(2, 2);
         T_c_r_estimated_ = Sophus::SE3d(
             eR, Sophus::Vector3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
+        bundleAdjustment(pts3d, pts2d, inliers);
+    }
+    void bundleAdjustment(std::vector<cv::Point3f> &pts3d, std::vector<cv::Point2f> &pts2d, cv::Mat &inliers)
+    {
+        using g2oBlock = g2o::BlockSolver<g2o::BlockSolverTraits<6, 2>>;
+        std::unique_ptr<g2oBlock::LinearSolverType> linearSolver = g2o::make_unique<g2o::LinearSolverDense<g2oBlock::PoseMatrixType>>();
+        g2o::OptimizationAlgorithmLevenberg *solver = new g2o::OptimizationAlgorithmLevenberg(g2o::make_unique<g2oBlock>(std::move(linearSolver)));
+        g2o::SparseOptimizer optimizer;
+        optimizer.setAlgorithm(solver);
+        // vertex
+        g2o::VertexSE3Expmap *pose = new g2o::VertexSE3Expmap();
+        pose->setId(0);
+        pose->setEstimate(g2o::SE3Quat(T_c_r_estimated_.rotationMatrix(), T_c_r_estimated_.translation()));
+        optimizer.addVertex(pose);
+        // edges
+        for (int i = 0; i < inliers.rows; ++i)
+        {
+            int idx = inliers.at<int>(i, 0);
+            EdgeProjectXYZ2UVPoseOnly *edge = new EdgeProjectXYZ2UVPoseOnly();
+            edge->setId(i);
+            edge->setVertex(0, pose);
+            edge->camera_ = curr_->camera_.get();
+            edge->point_ = Eigen::Vector3d(pts3d[idx].x, pts3d[idx].y, pts3d[idx].z);
+            edge->setMeasurement(Eigen::Vector2d(pts2d[idx].x, pts2d[idx].y));
+            edge->setInformation(Eigen::Matrix2d::Identity());
+            optimizer.addEdge(edge);
+        }
+        // optimize
+        optimizer.initializeOptimization();
+        optimizer.optimize(10);
+        T_c_r_estimated_ = Sophus::SE3d(pose->estimate().rotation(), pose->estimate().translation());
     }
     void setRef3DPoints()
     {

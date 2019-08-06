@@ -1,4 +1,6 @@
 #include <fstream>
+#include <chrono>
+#include <ctime>
 #include <opencv2/viz/vizcore.hpp>
 #include "common.hpp"
 #include "config.hpp"
@@ -28,6 +30,7 @@ int main(int argc, char **argv)
     std::vector<std::string> rgb_files, depth_files;
     std::vector<double> rgb_times, depth_times;
     std::vector<cv::Point3f> ground;
+    std::vector<Eigen::Quaterniond> ground_q;
     while (!fin.eof())
     {
         std::string rgb_file, depth_file;
@@ -38,6 +41,7 @@ int main(int argc, char **argv)
         rgb_files.push_back(dataset_dir + "/" + rgb_file);
         depth_files.push_back(dataset_dir + "/" + depth_file);
         ground.push_back(cv::Point3f(tx, ty, tz));
+        ground_q.push_back(Eigen::Quaterniond(qw, qx, qy, qz));
         if (fin.good() == false)
             break;
     }
@@ -47,7 +51,7 @@ int main(int argc, char **argv)
     // visualization
     cv::viz::Viz3d vis("Visual Odometry");
     cv::viz::WCoordinateSystem world_coor(1.0), camera_coor(0.5);
-    cv::Point3d cam_pos(0, -2.0, -2.0), cam_focal_point(0, 0, 0), cam_y_dir(0, 1, 0);
+    cv::Point3d cam_pos(0, 0, 2.0), cam_focal_point(0, 0, 0), cam_y_dir(0, 1, 0);
     cv::Affine3d cam_pose = cv::viz::makeCameraPose(cam_pos, cam_focal_point, cam_y_dir);
     vis.setViewerPose(cam_pose);
     world_coor.setRenderingProperty(cv::viz::LINE_WIDTH, 2.0);
@@ -71,7 +75,16 @@ int main(int argc, char **argv)
         pFrame->color_ = color;
         pFrame->depth_ = depth;
         pFrame->time_stamp_ = rgb_times[i];
+        if (i == 0)
+        {
+            Eigen::Quaterniond q_init();
+            Sophus::SE3d T_init(ground_q[0], Eigen::Vector3d(0, 0, 0));
+            pFrame->T_c_w_ = T_init;
+        }
+        auto t_start = std::chrono::system_clock::now();
         vo->addFrame(pFrame);
+        auto t_end = std::chrono::system_clock::now();
+        std::chrono::duration<double> d = t_end - t_start;
         if (vo->state_ == myslam::VisualOdometry::LOST)
             break;
         Sophus::SE3d Tcw = pFrame->T_c_w_.inverse();
@@ -90,7 +103,7 @@ int main(int argc, char **argv)
             vis.showWidget("path", path);
             vis.showWidget("path_", path_);
         }
-        
+
         cv::Affine3d M(
             cv::Affine3d::Mat3(
                 R(0, 0), R(0, 1), R(0, 2),
@@ -100,8 +113,11 @@ int main(int argc, char **argv)
                 t(0, 0), t(1, 0), t(2, 0)));
         vis.setWidgetPose("Camera", M);
         vis.spinOnce(1, false);
+        double t_cost = double(d.count()) * 1000.0;
+        std::string strText = "cost: " + std::to_string(t_cost) + " ms";
+        cv::putText(color, strText, cv::Point2d(40, 20), cv::FONT_HERSHEY_PLAIN, 2.0, cv::Scalar(0, 0, 255));
         cv::imshow("image", color);
-        cv::waitKey(30);
+        cv::waitKey((int(t_cost) >= 33) ? 1 : (33 - int(t_cost)));
     }
 
     return 0;
